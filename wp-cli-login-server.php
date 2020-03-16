@@ -47,6 +47,8 @@ function is_eligible_request()
 
 class WP_CLI_Login_Server
 {
+    public const WP_CLI_MAGIC_LINK_BEFORE_USER_LOGIN_ACTION = 'wp_cli_magic_link_before_user_login_action';
+
     /**
      * The http endpoint triggering the request.
      */
@@ -143,7 +145,7 @@ class WP_CLI_Login_Server
      *
      * @return WP_User
      */
-    private function validate(stdClass $magic)
+    public function validate(stdClass $magic)
     {
         if (empty($magic->user) || (! $user = new WP_User($magic->user)) || ! $user->exists()) {
             throw new InvalidUser('No user found or no longer exists.');
@@ -163,7 +165,7 @@ class WP_CLI_Login_Server
      *
      * @return stdClass
      */
-    private function loadMagic()
+    public function loadMagic()
     {
         $magic = json_decode(
             get_transient($this->magicKey())
@@ -184,6 +186,9 @@ class WP_CLI_Login_Server
     private function loginUser(WP_User $user)
     {
         delete_transient($this->magicKey());
+
+        do_action(self::WP_CLI_MAGIC_LINK_BEFORE_USER_LOGIN_ACTION, $user, $this);
+
         wp_set_auth_cookie($user->ID);
         wp_redirect(admin_url());
         exit;
