@@ -11,7 +11,10 @@
 
 namespace WP_CLI_Login;
 
+use Theme\Facades\LRT_Logger;
 use stdClass;
+use Theme\Helpers\CustomHeadHelper;
+use Theme\Helpers\PageHeaderHelper;
 use WP_User;
 use Exception;
 
@@ -20,11 +23,11 @@ use Exception;
  */
 function init_server_from_request()
 {
-    list($endpoint, $public) = WP_CLI_Login_Server::parseUri(@$_SERVER['REQUEST_URI']);
+    [$endpoint, $public] = WP_CLI_Login_Server::parseUri(@$_SERVER['REQUEST_URI']);
     WP_CLI_Login_Server::handle($endpoint, $public);
 }
 if (is_eligible_request()) {
-    add_action('plugins_loaded', __NAMESPACE__ . '\\init_server_from_request');
+    add_action('wp', __NAMESPACE__ . '\\init_server_from_request');
 }
 
 /**
@@ -172,7 +175,7 @@ class WP_CLI_Login_Server
         );
 
         if (is_null($magic)) {
-            throw new BadMagic('The attempted magic login has expired or already been used.');
+            throw new BadMagic('The attempted magic login link has expired or has already been used.');
         }
 
         return $magic;
@@ -203,10 +206,15 @@ class WP_CLI_Login_Server
     {
         $exception        = get_class($e);
         $exceptionMessage = $e->getMessage();
-        $common           = sprintf('Try again perhaps? or <a href="%s">Go Home &rarr;</a>', esc_url(home_url()));
+        $common           = sprintf('<a href="%s">Go Home &rarr;</a>', esc_url(home_url()));
         $message          = "<strong>$exceptionMessage</strong><p>$common</p>";
 
-        wp_die($message, $exception, ['response' => 410]);
+        LRT_Logger::log("Magic Login Error {$e->getMessage()}", 'ERROR', true, [
+            'Endpoint' => $this->endpoint,
+            'Public Key' => $this->publicKey
+        ]);
+
+        wp_die($message, 'Error with Magic Link Login Attempt', ['response' => 410]);
     }
 
     /**
